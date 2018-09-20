@@ -4,13 +4,25 @@ to the Neo4j docker instance
 """
 import json
 
-from quart import Quart, request
+from quart import Quart, request, send_from_directory
 from quart_cors import cors
 
-from database import db
+from database import access_correct_function_to_engage_with_db
 
-app = Quart(__name__)
+app = Quart(
+    __name__,
+    static_folder='static')
 app = cors(app)
+
+
+@app.route('/riot', methods=['GET'])
+async def riot(path):
+    """
+    Specific end point for riot
+    """
+    return send_from_directory(
+        app.static_folder,
+        'riot.txt')
 
 
 @app.route('/', methods=['POST'])
@@ -24,31 +36,6 @@ async def hello():
         data = await request.get_data()
         res = json.loads(data)
 
-        with db.session() as session:
-            possible_change_types = {
-                'note': 'TemplateNote',
-                'title': 'TemplateTitle'
-            }
-
-            neo_res = session.run("MATCH (a:" +
-                                  possible_change_types[res['changeType']] +
-                                  " {" + res['changeType'] + ": '" +
-                                  res['oldWord'] + "'}) "
-                                  "SET a."+res['changeType'] +
-                                  "= '" + res['newWord'] + "' "
-                                  "RETURN "
-                                  "CASE a.note "
-                                  "WHEN '" + res['newWord'] + "' "
-                                  "THEN true "
-                                  "END")
-            neo_res_unwrapped = neo_res.value()
-
-            if not neo_res_unwrapped:
-                return json.dumps({'confirmation': 'danger'})
-            elif neo_res_unwrapped:
-                return json.dumps({'confirmation': 'success'})
-            else:
-                print('fuck')
 
 if __name__ == '__main__':
     app.run(debug=True,
